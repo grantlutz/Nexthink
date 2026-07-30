@@ -39,9 +39,9 @@ Everything here comes from real work on real endpoints, but it is published **as
 |---|---|---|
 | [Scripts/Crowdstrike/](Scripts/Crowdstrike/) | Stops the CrowdStrike Falcon services (`csagent`, `csfalconservice`). | 🔴 **High** — disables endpoint security protection. |
 | [Scripts/Tanium/](Scripts/Tanium/) | Fully removes the Tanium Client — stops processes/services, runs the uninstaller, deletes the install directory and registry keys. | 🔴 **High** — irreversible removal of a management agent. |
-| [Scripts/Windows/](Scripts/Windows/) | Reports the last successful logon (Security event ID 4624) and days elapsed. | 🟢 **Low** — read-only. |
+| [Scripts/Windows/](Scripts/Windows/) | Reports the last interactive logon (Security event ID 4624) and days elapsed. | 🟢 **Low** — read-only. |
 
-> **Note on Remote Action compliance:** not every script here is a fully compliant Remote Action yet. Some are standalone PowerShell that still needs input/output plumbing (`param()` block, `nxtremoteactions.dll`, `[Nxt]::WriteOutput*` calls) before Nexthink can pass it parameters or store its results. Each script's README states where it stands. The references in [Markdowns/](Markdowns/) explain exactly what a compliant script requires.
+> **Remote Action compliance:** each folder contains a compliant Remote Action (the `-v1` file) built against the references in [Markdowns/](Markdowns/) — parameterized inputs, a fixed output schema, proper encoding, error handling, and exit codes. The **original script is kept unmodified alongside it** so any change can be reverted. See [Scripts/README.md](Scripts/README.md) for the version map.
 
 ---
 

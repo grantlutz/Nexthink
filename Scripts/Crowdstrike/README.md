@@ -22,11 +22,51 @@ This PowerShell script is designed to stop the CrowdStrike Falcon services (`csa
 - Handles cases where services are already stopped or do not exist.
 - Exits with code `0` on success and `1` on error, for Nexthink RA compatibility.
 
-## Remote Action compliance status
+## Files
 
-Partially compliant. The script has the error `trap` and correct exit-code behavior, but it has **no `param()` block and no Nexthink outputs** — it does not load `nxtremoteactions.dll` or call `[Nxt]::WriteOutput*`, so results are printed to the console rather than stored in the data layer.
+| File | Status |
+|---|---|
+| `Stop-CrowdStrikeServices-v1.ps1` | ✅ **Compliant Remote Action** — use this one. |
+| `stop-crowdstrike.ps1` | Original, kept unmodified for reference and rollback. |
 
-To make it fully compliant (parameterized service names, output fields for per-service results), see the [Windows reference](../../Markdowns/nexthink-remote-actions-windows-reference.md).
+## Remote Action compliance — `Stop-CrowdStrikeServices-v1.ps1`
+
+Fully compliant per the [Windows reference](../../Markdowns/nexthink-remote-actions-windows-reference.md): UTF-8 BOM / CRLF encoding, `param()` block, `nxtremoteactions.dll` loaded, error `trap`, and a deterministic 8-field output schema written unconditionally as the final step.
+
+### Inputs (as they appear in the Nexthink UI)
+
+| Name | Default | Notes |
+|---|---|---|
+| `ServiceNames` | `csagent,csfalconservice` | Comma-separated service names. Split, trimmed, de-duplicated by the script. |
+| `StopTimeoutSeconds` | `30` | Seconds to wait per service for the Stopped state. Range 1–600. |
+
+### Outputs
+
+| Name | Type | Meaning |
+|---|---|---|
+| `ServicesRequested` | UInt32 | Distinct service names supplied. |
+| `ServicesStopped` | UInt32 | Services this run transitioned to Stopped. |
+| `ServicesAlreadyStopped` | UInt32 | Already stopped; no action taken. |
+| `ServicesNotFound` | UInt32 | Not installed on the device. |
+| `ServicesFailed` | UInt32 | Present but could not be stopped. |
+| `AllRequestedServicesStopped` | Bool | True when nothing requested is left running. |
+| `ExecutionTime` | String | Completion time, `yyyy-MM-dd HH:mm:ss`. |
+| `ExecutionSummary` | String | Per-service outcomes, pipe separated. |
+
+The four outcome counts always sum exactly to `ServicesRequested`.
+
+### What changed from the original
+
+- Service names and the stop timeout became **input parameters** — the script is now generic and can be re-pointed without breaking its signature.
+- Added the **Nexthink output schema**; the original only wrote to the console, so nothing reached the data layer.
+- Added **post-stop verification**: the service state is re-read after the attempt rather than trusting `Stop-Service`. This matters because Falcon tamper protection can block or immediately reverse a stop — the original would have reported success in that case.
+- Added a **wait-for-stopped timeout**; `Stop-Service` returns before the transition completes.
+- A service that exists but will not stop is now a **real failure** (exit 1) instead of being silently absorbed.
+- Absent or already-stopped services are explicitly **not** failures, so the action is idempotent.
+
+### Execution context
+
+**Local System (required).** Stopping a protected service needs administrative privileges.
 
 ## Usage
 
@@ -42,10 +82,10 @@ To make it fully compliant (parameterized service names, output fields for per-s
 ### Nexthink Remote Action
 
 1. Create a new Remote Action in the Nexthink web interface.
-2. Upload the `stop-crowdstrike.ps1` script.
-3. The script requires no parameters.
-4. Ensure the Remote Action is configured to run with `Local System` privileges.
-5. The script will report success or failure back to Nexthink based on its exit code.
+2. Upload **`Stop-CrowdStrikeServices-v1.ps1`** (sign it first for production use).
+3. Nexthink detects the two parameters and the eight outputs automatically; set labels and defaults as needed.
+4. Under Advanced Configuration, set the context to **Local System** and a timeout of roughly 120 seconds (worst case is `StopTimeoutSeconds` per requested service).
+5. The script reports success or failure back to Nexthink based on its exit code, with detail in `ExecutionSummary`.
 
 ---
 
