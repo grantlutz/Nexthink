@@ -28,6 +28,8 @@
 
 Two assemblies ship with the Nexthink Collector and must be loaded before using their respective classes.
 
+> **Placement:** the `Add-Type` calls go **immediately below the input parameters** — the `param()` block must be the first statement in a PowerShell script, and the DLL loads are the very next thing after it. They live at the **top** of the script (never down by the output writes at the bottom) and must run before any `[Nxt]` / `[Nxt.CampaignAction]` call. (The official §7 template wraps the load in an `Add-NexthinkRemoteActionDLL` helper — a code-organization detail only; the rule stands: inputs first, DLL load right after.)
+
 ### 2.1 Remote Actions DLL
 
 ```powershell
@@ -35,7 +37,7 @@ Add-Type -Path "$env:NEXTHINK\RemoteActions\nxtremoteactions.dll"
 ```
 
 - **Provides:** the `[Nxt]` class (output write methods).
-- **Must be loaded** before any `[Nxt]::WriteOutput*` call.
+- **Must be loaded** before any `[Nxt]::WriteOutput*` call — placed **immediately after** the `param()` block (see placement note above).
 
 ### 2.2 Campaign Actions DLL
 
@@ -44,7 +46,7 @@ Add-Type -Path "$env:NEXTHINK\RemoteActions\nxtcampaignaction.dll"
 ```
 
 - **Provides:** the `[Nxt.CampaignAction]` class (campaign control methods).
-- **Must be loaded** before any campaign interaction.
+- **Must be loaded** before any campaign interaction — placed **immediately after** the `param()` block, alongside the remote actions DLL (see placement note above).
 
 > **Note:** The docs show the path unquoted; Nexthink Library scripts use the quoted form (`"$env:NEXTHINK\..."`). Both work — prefer the quoted form and test that the DLL file exists before calling `Add-Type` (see the template in §7).
 
@@ -52,7 +54,7 @@ Add-Type -Path "$env:NEXTHINK\RemoteActions\nxtcampaignaction.dll"
 
 ## 3. Input Variables (Script Parameters)
 
-Declare formal parameters at the top of the script using a `param()` block. This keeps the script generic and signature-safe — actual values are supplied through the Nexthink web interface at remote action configuration time.
+Declare formal parameters at the top of the script using a `param()` block. This keeps the script generic and signature-safe — actual values are supplied through the Nexthink web interface at remote action configuration time. The DLL `Add-Type` calls (§2) come immediately after this block; everything else follows.
 
 ```powershell
 param(
@@ -453,7 +455,7 @@ Use this checklist before uploading any remote action script:
 **Inputs & outputs**
 - [ ] All input parameters are declared in a `param()` block at the top (**≤ 50 inputs**, ≤ 30 KB total)
 - [ ] Script validates/converts all inputs — every value arrives as a **string**
-- [ ] `nxtremoteactions.dll` is loaded if using any `[Nxt]::WriteOutput*` method
+- [ ] `nxtremoteactions.dll` is loaded if using any `[Nxt]::WriteOutput*` method — `Add-Type` placed **immediately after** the `param()` block (top of script), before any `[Nxt]` call
 - [ ] All output field names are **predefined strings** (not dynamic); **≤ 50 outputs**
 - [ ] Output field count is **fixed** (no loop-generated fields)
 - [ ] Each `WriteOutput*` call uses the correct PowerShell type and respects its constraints
@@ -463,7 +465,7 @@ Use this checklist before uploading any remote action script:
 - [ ] UInt32 outputs are between 0 and 4,294,967,295
 
 **Campaigns**
-- [ ] `nxtcampaignaction.dll` is loaded if using any `[Nxt.CampaignAction]::` method
+- [ ] `nxtcampaignaction.dll` is loaded if using any `[Nxt.CampaignAction]::` method — `Add-Type` placed **immediately after** the `param()` block (top of script)
 - [ ] Campaign IDs are passed as parameters (NQL ID recommended, requires Collector ≥ 23.5)
 - [ ] `GetResponseAnswer` return values are handled as `string[]`
 - [ ] Free text in campaign answers is understood to be **ignored** in self-help scenarios
